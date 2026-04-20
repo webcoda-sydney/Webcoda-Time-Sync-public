@@ -8,8 +8,15 @@ import {
 
 const app = express();
 
-app.get("/", (_req, res) => {
-  res.send("Asana OAuth service running.");
+app.get("/", (req, res) => {
+  const everhourId = req.query.everhour_id;
+  if (everhourId) {
+    return res.redirect(`/auth/asana?everhour_id=${encodeURIComponent(String(everhourId))}`);
+  }
+
+  return res.status(400).send(
+    "Missing everhour_id. Open /?everhour_id=YOUR_EVERHOUR_ID to begin Asana authorization."
+  );
 });
 
 app.get("/auth/asana", (req, res) => {
@@ -55,7 +62,6 @@ app.get("/auth/asana/callback", async (req, res) => {
       everhourUserId: Number(everhourId),
       asanaUserGid: me.gid,
       asanaEmail: me.email,
-      accessToken: token.access_token,
       refreshToken: token.refresh_token,
       expiresIn: token.expires_in
     });

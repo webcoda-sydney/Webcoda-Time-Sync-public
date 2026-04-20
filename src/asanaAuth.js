@@ -43,7 +43,6 @@ export async function upsertAsanaToken({
   everhourUserId,
   asanaUserGid,
   asanaEmail,
-  accessToken,
   refreshToken,
   expiresIn
 }) {
@@ -54,9 +53,9 @@ export async function upsertAsanaToken({
     everhour_user_id: everhourUserId,
     asana_user_gid: asanaUserGid,
     asana_email: asanaEmail,
-    access_token: accessToken,
     refresh_token: refreshToken,
-    expires_at: expiresAt
+    expires_at: expiresAt,
+    updated_at: new Date().toISOString()
   });
 
   if (error) {
@@ -77,46 +76,43 @@ export async function getFreshToken(everhourUserId) {
     return null;
   }
 
-  const refreshWindowMs = 5 * 60 * 1000;
-  const expiresAt = new Date(data.expires_at).getTime();
-
-  if (Number.isNaN(expiresAt) || expiresAt < Date.now() + refreshWindowMs) {
-    const res = await fetch(ASANA_TOKEN_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        grant_type: "refresh_token",
-        client_id: env.ASANA_CLIENT_ID,
-        client_secret: env.ASANA_CLIENT_SECRET,
-        refresh_token: data.refresh_token
-      })
-    });
-
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Asana token refresh failed: ${res.status} ${body}`);
-    }
-
-    const refreshed = await res.json();
-    const newExpiry = new Date(
-      Date.now() + Number(refreshed.expires_in) * 1000
-    ).toISOString();
-
-    const { error: updateError } = await supabase
-      .from("asana_tokens")
-      .update({
-        access_token: refreshed.access_token,
-        expires_at: newExpiry,
-        refresh_token: refreshed.refresh_token ?? data.refresh_token
-      })
-      .eq("everhour_user_id", everhourUserId);
-
-    if (updateError) {
-      throw new Error(`Supabase token update failed: ${updateError.message}`);
-    }
-
-    return refreshed.access_token;
+  if (!data.refresh_token) {
+    return null;
   }
 
-  return data.access_token;
+  const res = await fetch(ASANA_TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "refresh_token",
+      client_id: env.ASANA_CLIENT_ID,
+      client_secret: env.ASANA_CLIENT_SECRET,
+      refresh_token: data.refresh_token
+    })
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Asana token refresh failed: ${res.status} ${body}`);
+  }
+
+  const refreshed = await res.json();
+  const newExpiry = new Date(
+    Date.now() + Number(refreshed.expires_in) * 1000
+  ).toISOString();
+
+  const { error: updateError } = await supabase
+    .from("asana_tokens")
+    .update({
+      refresh_token: refreshed.refresh_token ?? data.refresh_token,
+      expires_at: newExpiry,
+      updated_at: new Date().toISOString()
+    })
+    .eq("everhour_user_id", everhourUserId);
+
+  if (updateError) {
+    throw new Error(`Supabase token update failed: ${updateError.message}`);
+  }
+
+  return refreshed.access_token ?? null;
 }

@@ -29,3 +29,5 @@ Send each user a link like:
 `https://your-app.vercel.app/auth/asana?everhour_id=848268`
 
 The callback stores tokens in `asana_tokens` keyed by `everhour_user_id`.
+
+Important: the callback path is `/auth/asana/callback` (not `/asana/callback`).

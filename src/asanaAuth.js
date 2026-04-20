@@ -21,7 +21,8 @@ function formatSupabaseError(operation, error, context = {}) {
     rawError ? `raw=${rawError}` : null
   ].filter(Boolean);
 
-  return parts.join(" | ");
+  const combined = parts.join(" | ");
+  return combined || `Supabase ${operation} failed | no error details returned`;
 }
 
 export async function exchangeCodeForToken(code) {

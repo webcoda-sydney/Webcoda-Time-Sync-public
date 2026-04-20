@@ -8,6 +8,28 @@ import {
 
 const app = express();
 
+function serializeError(error) {
+  const type = Object.prototype.toString.call(error);
+  const payload = {
+    type,
+    isErrorInstance: error instanceof Error
+  };
+
+  if (error && typeof error === "object") {
+    for (const key of Object.getOwnPropertyNames(error)) {
+      payload[key] = error[key];
+    }
+  } else {
+    payload.value = error;
+  }
+
+  if (!payload.message || String(payload.message).trim() === "") {
+    payload.message = "Unknown error (empty message)";
+  }
+
+  return payload;
+}
+
 app.get("/", (req, res) => {
   const everhourId = req.query.everhour_id;
   if (everhourId) {
@@ -65,16 +87,31 @@ app.get("/auth/asana/callback", async (req, res) => {
         .send("Missing code or state in OAuth callback parameters.");
     }
 
-    const token = await exchangeCodeForToken(String(code));
-    const me = await fetchAsanaUserProfile(token.access_token);
+    let token;
+    try {
+      token = await exchangeCodeForToken(String(code));
+    } catch (error) {
+      throw new Error(`token_exchange_failed | ${JSON.stringify(serializeError(error))}`);
+    }
 
-    await upsertAsanaToken({
-      everhourUserId: Number(everhourId),
-      asanaUserGid: me.gid,
-      asanaEmail: me.email,
-      refreshToken: token.refresh_token,
-      expiresIn: token.expires_in
-    });
+    let me;
+    try {
+      me = await fetchAsanaUserProfile(token.access_token);
+    } catch (error) {
+      throw new Error(`profile_fetch_failed | ${JSON.stringify(serializeError(error))}`);
+    }
+
+    try {
+      await upsertAsanaToken({
+        everhourUserId: Number(everhourId),
+        asanaUserGid: me.gid,
+        asanaEmail: me.email,
+        refreshToken: token.refresh_token,
+        expiresIn: token.expires_in
+      });
+    } catch (error) {
+      throw new Error(`supabase_upsert_failed | ${JSON.stringify(serializeError(error))}`);
+    }
 
     return res.send("Connected! You can close this tab.");
   } catch (error) {
@@ -88,16 +125,9 @@ app.get("/auth/asana/callback", async (req, res) => {
       );
     }
 
-    const own = {};
-    if (error && typeof error === "object") {
-      for (const key of Object.getOwnPropertyNames(error)) {
-        own[key] = error[key];
-      }
-    }
-
-    console.error("OAuth callback error", own);
-
-    const fallback = error?.message || JSON.stringify(own) || String(error);
+    const serialized = serializeError(error);
+    console.error("OAuth callback error", serialized);
+    const fallback = serialized.message || JSON.stringify(serialized);
 
     return res.status(500).send(`OAuth callback failed: ${fallback}`);
   }

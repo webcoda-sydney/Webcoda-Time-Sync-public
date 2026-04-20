@@ -3,6 +3,19 @@ import { getEnv } from "./env.js";
 
 const ASANA_TOKEN_URL = "https://app.asana.com/-/oauth_token";
 
+function formatSupabaseError(operation, error, context = {}) {
+  const parts = [
+    `Supabase ${operation} failed`,
+    error?.code ? `code=${error.code}` : null,
+    error?.message ? `message=${error.message}` : null,
+    error?.details ? `details=${error.details}` : null,
+    error?.hint ? `hint=${error.hint}` : null,
+    Object.keys(context).length > 0 ? `context=${JSON.stringify(context)}` : null
+  ].filter(Boolean);
+
+  return parts.join(" | ");
+}
+
 export async function exchangeCodeForToken(code) {
   const env = getEnv();
   const res = await fetch(ASANA_TOKEN_URL, {
@@ -59,7 +72,12 @@ export async function upsertAsanaToken({
   });
 
   if (error) {
-    throw new Error(`Supabase upsert failed: ${error.message}`);
+    throw new Error(
+      formatSupabaseError("upsert", error, {
+        table: "asana_tokens",
+        everhour_user_id: everhourUserId
+      })
+    );
   }
 }
 
@@ -111,7 +129,12 @@ export async function getFreshToken(everhourUserId) {
     .eq("everhour_user_id", everhourUserId);
 
   if (updateError) {
-    throw new Error(`Supabase token update failed: ${updateError.message}`);
+    throw new Error(
+      formatSupabaseError("update", updateError, {
+        table: "asana_tokens",
+        everhour_user_id: everhourUserId
+      })
+    );
   }
 
   return refreshed.access_token ?? null;

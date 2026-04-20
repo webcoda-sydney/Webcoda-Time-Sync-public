@@ -4,6 +4,13 @@ import { getEnv } from "./env.js";
 const ASANA_TOKEN_URL = "https://app.asana.com/-/oauth_token";
 
 function formatSupabaseError(operation, error, context = {}) {
+  const own = {};
+  if (error && typeof error === "object") {
+    for (const key of Object.getOwnPropertyNames(error)) {
+      own[key] = error[key];
+    }
+  }
+
   let rawError = "";
   try {
     rawError = JSON.stringify(error);
@@ -18,6 +25,7 @@ function formatSupabaseError(operation, error, context = {}) {
     error?.details ? `details=${error.details}` : null,
     error?.hint ? `hint=${error.hint}` : null,
     Object.keys(context).length > 0 ? `context=${JSON.stringify(context)}` : null,
+    Object.keys(own).length > 0 ? `own=${JSON.stringify(own)}` : null,
     rawError ? `raw=${rawError}` : null
   ].filter(Boolean);
 

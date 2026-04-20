@@ -110,7 +110,11 @@ app.get("/auth/asana/callback", async (req, res) => {
         expiresIn: token.expires_in
       });
     } catch (error) {
-      throw new Error(`supabase_upsert_failed | ${JSON.stringify(serializeError(error))}`);
+      const wrapped = new Error(
+        `supabase_upsert_failed | ${JSON.stringify(serializeError(error))}`
+      );
+      wrapped.cause = serializeError(error);
+      throw wrapped;
     }
 
     return res.send("Connected! You can close this tab.");
@@ -127,9 +131,13 @@ app.get("/auth/asana/callback", async (req, res) => {
 
     const serialized = serializeError(error);
     console.error("OAuth callback error", serialized);
-    const fallback = serialized.message || JSON.stringify(serialized);
+    const fallback = serialized.message || "Unknown callback error";
 
-    return res.status(500).send(`OAuth callback failed: ${fallback}`);
+    return res.status(500).json({
+      error: "OAuth callback failed",
+      message: fallback,
+      details: serialized
+    });
   }
 });
 

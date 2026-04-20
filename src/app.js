@@ -88,15 +88,16 @@ app.get("/auth/asana/callback", async (req, res) => {
       );
     }
 
-    const fallback =
-      error?.message ||
-      (() => {
-        try {
-          return JSON.stringify(error);
-        } catch (_e) {
-          return String(error);
-        }
-      })();
+    const own = {};
+    if (error && typeof error === "object") {
+      for (const key of Object.getOwnPropertyNames(error)) {
+        own[key] = error[key];
+      }
+    }
+
+    console.error("OAuth callback error", own);
+
+    const fallback = error?.message || JSON.stringify(own) || String(error);
 
     return res.status(500).send(`OAuth callback failed: ${fallback}`);
   }

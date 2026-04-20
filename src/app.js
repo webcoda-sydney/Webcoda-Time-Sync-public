@@ -46,7 +46,7 @@ app.get("/auth/asana", (req, res) => {
   try {
     env = getEnv();
   } catch (error) {
-    return res.status(500).send(error.message);
+    return res.status(500).send(`Environment error: ${error?.message || "Unknown env error"}`);
   }
 
   const everhourId = req.query.everhour_id;

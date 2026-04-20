@@ -68,6 +68,7 @@ export async function upsertAsanaToken({
   refreshToken,
   expiresIn
 }) {
+  const env = getEnv();
   const supabase = getSupabaseClient();
   const expiresAt = new Date(Date.now() + Number(expiresIn) * 1000).toISOString();
 
@@ -86,6 +87,7 @@ export async function upsertAsanaToken({
       formatSupabaseError("upsert", fallbackError, {
         table: "asana_tokens",
         everhour_user_id: everhourUserId,
+        supabase_key_role: env.SUPABASE_KEY_ROLE,
         status,
         statusText,
         hasData: Boolean(data)
@@ -148,6 +150,7 @@ export async function getFreshToken(everhourUserId) {
       formatSupabaseError("update", fallbackError, {
         table: "asana_tokens",
         everhour_user_id: everhourUserId,
+        supabase_key_role: env.SUPABASE_KEY_ROLE,
         status,
         statusText,
         hasData: Boolean(updateData)

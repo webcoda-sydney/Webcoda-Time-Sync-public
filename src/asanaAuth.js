@@ -3,6 +3,10 @@ import { getEnv } from "./env.js";
 
 const ASANA_TOKEN_URL = "https://app.asana.com/-/oauth_token";
 
+function asanaTokensTable(supabase) {
+  return supabase.schema("public").from("asana_tokens");
+}
+
 function formatSupabaseError(operation, error, context = {}) {
   const own = {};
   if (error && typeof error === "object") {
@@ -80,7 +84,7 @@ export async function upsertAsanaToken({
   const supabase = getSupabaseClient();
   const expiresAt = new Date(Date.now() + Number(expiresIn) * 1000).toISOString();
 
-  const { data, error, status, statusText } = await supabase.from("asana_tokens").upsert({
+  const { data, error, status, statusText } = await asanaTokensTable(supabase).upsert({
     everhour_user_id: everhourUserId,
     asana_user_gid: asanaUserGid,
     asana_email: asanaEmail,
@@ -90,6 +94,12 @@ export async function upsertAsanaToken({
   });
 
   if (error || (typeof status === "number" && status >= 400)) {
+    if (status === 404) {
+      throw new Error(
+        `Supabase upsert failed: table public.asana_tokens not found via REST API (status=404). Check SUPABASE_URL points to the correct project and that table public.asana_tokens exists.`
+      );
+    }
+
     const fallbackError = error ?? new Error(`status=${status} statusText=${statusText}`);
     throw new Error(
       formatSupabaseError("upsert", fallbackError, {
@@ -107,11 +117,16 @@ export async function upsertAsanaToken({
 export async function getFreshToken(everhourUserId) {
   const env = getEnv();
   const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from("asana_tokens")
+  const { data, error, status } = await asanaTokensTable(supabase)
     .select("*")
     .eq("everhour_user_id", everhourUserId)
     .single();
+
+  if (status === 404) {
+    throw new Error(
+      "Supabase select failed: table public.asana_tokens not found via REST API (status=404)."
+    );
+  }
 
   if (error || !data) {
     return null;
@@ -142,8 +157,12 @@ export async function getFreshToken(everhourUserId) {
     Date.now() + Number(refreshed.expires_in) * 1000
   ).toISOString();
 
-  const { data: updateData, error: updateError, status, statusText } = await supabase
-    .from("asana_tokens")
+  const {
+    data: updateData,
+    error: updateError,
+    status: updateStatus,
+    statusText: updateStatusText
+  } = await asanaTokensTable(supabase)
     .update({
       refresh_token: refreshed.refresh_token ?? data.refresh_token,
       expires_at: newExpiry,
@@ -151,16 +170,22 @@ export async function getFreshToken(everhourUserId) {
     })
     .eq("everhour_user_id", everhourUserId);
 
-  if (updateError || (typeof status === "number" && status >= 400)) {
+  if (updateError || (typeof updateStatus === "number" && updateStatus >= 400)) {
+    if (updateStatus === 404) {
+      throw new Error(
+        "Supabase update failed: table public.asana_tokens not found via REST API (status=404)."
+      );
+    }
+
     const fallbackError =
-      updateError ?? new Error(`status=${status} statusText=${statusText}`);
+      updateError ?? new Error(`status=${updateStatus} statusText=${updateStatusText}`);
     throw new Error(
       formatSupabaseError("update", fallbackError, {
         table: "asana_tokens",
         everhour_user_id: everhourUserId,
         supabase_key_role: env.SUPABASE_KEY_ROLE,
-        status,
-        statusText,
+        status: updateStatus,
+        statusText: updateStatusText,
         hasData: Boolean(updateData)
       })
     );

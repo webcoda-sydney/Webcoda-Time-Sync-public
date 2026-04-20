@@ -1,9 +1,10 @@
-import { supabase } from "./supabase.js";
-import { env } from "./env.js";
+import { getSupabaseClient } from "./supabase.js";
+import { getEnv } from "./env.js";
 
 const ASANA_TOKEN_URL = "https://app.asana.com/-/oauth_token";
 
 export async function exchangeCodeForToken(code) {
+  const env = getEnv();
   const res = await fetch(ASANA_TOKEN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -46,6 +47,7 @@ export async function upsertAsanaToken({
   refreshToken,
   expiresIn
 }) {
+  const supabase = getSupabaseClient();
   const expiresAt = new Date(Date.now() + Number(expiresIn) * 1000).toISOString();
 
   const { error } = await supabase.from("asana_tokens").upsert({
@@ -63,6 +65,8 @@ export async function upsertAsanaToken({
 }
 
 export async function getFreshToken(everhourUserId) {
+  const env = getEnv();
+  const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from("asana_tokens")
     .select("*")

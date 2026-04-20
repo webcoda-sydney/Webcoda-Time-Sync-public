@@ -1,5 +1,5 @@
 import express from "express";
-import { env } from "./env.js";
+import { getEnv } from "./env.js";
 import {
   exchangeCodeForToken,
   fetchAsanaUserProfile,
@@ -13,6 +13,13 @@ app.get("/", (_req, res) => {
 });
 
 app.get("/auth/asana", (req, res) => {
+  let env;
+  try {
+    env = getEnv();
+  } catch (error) {
+    return res.status(500).send(error.message);
+  }
+
   const everhourId = req.query.everhour_id;
 
   if (!everhourId) {
@@ -31,6 +38,7 @@ app.get("/auth/asana", (req, res) => {
 
 app.get("/auth/asana/callback", async (req, res) => {
   try {
+    getEnv();
     const code = req.query.code;
     const everhourId = req.query.state;
 

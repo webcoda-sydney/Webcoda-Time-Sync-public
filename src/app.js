@@ -46,6 +46,16 @@ app.get("/auth/asana", (req, res) => {
 app.get("/auth/asana/callback", async (req, res) => {
   try {
     getEnv();
+    const asanaError = req.query.error;
+    const asanaErrorDescription = req.query.error_description;
+    if (asanaError) {
+      return res.status(400).send(
+        `Asana authorization was not completed (${asanaError}${
+          asanaErrorDescription ? `: ${asanaErrorDescription}` : ""
+        }). Please start again from the auth link.`
+      );
+    }
+
     const code = req.query.code;
     const everhourId = req.query.state;
 
@@ -68,7 +78,27 @@ app.get("/auth/asana/callback", async (req, res) => {
 
     return res.send("Connected! You can close this tab.");
   } catch (error) {
-    return res.status(500).send(`OAuth callback failed: ${error.message}`);
+    if (
+      typeof error?.message === "string" &&
+      error.message.includes("invalid_grant") &&
+      error.message.includes("previously deactivated")
+    ) {
+      return res.status(400).send(
+        "This Asana authorization link/code has already been used. Please start again from your /auth/asana?everhour_id=... link to generate a fresh code."
+      );
+    }
+
+    const fallback =
+      error?.message ||
+      (() => {
+        try {
+          return JSON.stringify(error);
+        } catch (_e) {
+          return String(error);
+        }
+      })();
+
+    return res.status(500).send(`OAuth callback failed: ${fallback}`);
   }
 });
 

@@ -70,7 +70,7 @@ export async function upsertAsanaToken({
   const supabase = getSupabaseClient();
   const expiresAt = new Date(Date.now() + Number(expiresIn) * 1000).toISOString();
 
-  const { error } = await supabase.from("asana_tokens").upsert({
+  const { data, error, status, statusText } = await supabase.from("asana_tokens").upsert({
     everhour_user_id: everhourUserId,
     asana_user_gid: asanaUserGid,
     asana_email: asanaEmail,
@@ -79,11 +79,15 @@ export async function upsertAsanaToken({
     updated_at: new Date().toISOString()
   });
 
-  if (error) {
+  if (error || (typeof status === "number" && status >= 400)) {
+    const fallbackError = error ?? new Error(`status=${status} statusText=${statusText}`);
     throw new Error(
-      formatSupabaseError("upsert", error, {
+      formatSupabaseError("upsert", fallbackError, {
         table: "asana_tokens",
-        everhour_user_id: everhourUserId
+        everhour_user_id: everhourUserId,
+        status,
+        statusText,
+        hasData: Boolean(data)
       })
     );
   }
@@ -127,7 +131,7 @@ export async function getFreshToken(everhourUserId) {
     Date.now() + Number(refreshed.expires_in) * 1000
   ).toISOString();
 
-  const { error: updateError } = await supabase
+  const { data: updateData, error: updateError, status, statusText } = await supabase
     .from("asana_tokens")
     .update({
       refresh_token: refreshed.refresh_token ?? data.refresh_token,
@@ -136,11 +140,16 @@ export async function getFreshToken(everhourUserId) {
     })
     .eq("everhour_user_id", everhourUserId);
 
-  if (updateError) {
+  if (updateError || (typeof status === "number" && status >= 400)) {
+    const fallbackError =
+      updateError ?? new Error(`status=${status} statusText=${statusText}`);
     throw new Error(
-      formatSupabaseError("update", updateError, {
+      formatSupabaseError("update", fallbackError, {
         table: "asana_tokens",
-        everhour_user_id: everhourUserId
+        everhour_user_id: everhourUserId,
+        status,
+        statusText,
+        hasData: Boolean(updateData)
       })
     );
   }

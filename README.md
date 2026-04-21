@@ -19,6 +19,7 @@ Implementation scaffold generated from `Asana-OAuth-Spec.pdf`.
 2. Copy env file:
    - `copy .env.example .env`
 3. Fill environment values in `.env` (and in Vercel Project Settings -> Environment Variables for deployment)
+   - Include `EVERHOUR_API_KEY` so callback can verify Everhour user email matches Asana email.
 4. Start server:
    - `npm run dev`
 

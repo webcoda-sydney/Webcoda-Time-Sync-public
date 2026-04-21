@@ -5,7 +5,6 @@ import {
   fetchAsanaUserProfile,
   upsertAsanaToken
 } from "./asanaAuth.js";
-import { assertEmailsMatch, fetchEverhourUserEmail } from "./everhour.js";
 
 const app = express();
 
@@ -103,17 +102,6 @@ app.get("/auth/asana/callback", async (req, res) => {
     }
 
     try {
-      const everhourEmail = await fetchEverhourUserEmail(String(everhourId));
-      assertEmailsMatch({
-        everhourUserId: String(everhourId),
-        everhourEmail,
-        asanaEmail: me.email
-      });
-    } catch (error) {
-      throw new Error(`email_match_validation_failed | ${JSON.stringify(serializeError(error))}`);
-    }
-
-    try {
       await upsertAsanaToken({
         everhourUserId: Number(everhourId),
         asanaUserGid: me.gid,
@@ -138,16 +126,6 @@ app.get("/auth/asana/callback", async (req, res) => {
     ) {
       return res.status(400).send(
         "This Asana authorization link/code has already been used. Please start again from your /auth/asana?everhour_id=... link to generate a fresh code."
-      );
-    }
-
-    if (
-      typeof error?.message === "string" &&
-      error.message.includes("email_match_validation_failed") &&
-      error.message.includes("Email mismatch for everhour_id=")
-    ) {
-      return res.status(400).send(
-        "The Everhour user does not match this Asana account email. Please sign in to Asana with the correct account and try again."
       );
     }
 
